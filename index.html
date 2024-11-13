@@ -21,7 +21,7 @@
             height: 100%;
             z-index: 1;
         }
-        #video-player video {
+        #video-player video, #video-player iframe {
             width: 100%;
             height: 100%;
         }
@@ -235,7 +235,9 @@
 <body>
 
     <div id="video-player">
-        <video id="player" width="100%" height="100%" autoplay controls></video>
+        <div id="video-placeholder">
+            <video id="player" width="100%" height="100%" autoplay controls></video>
+        </div>
     </div>
 
     <div id="current-channel-info" style="position: fixed; top: 10px; left: 10px; color: white;">
@@ -263,6 +265,9 @@
             <div id="saved-channels-list" style="display: none;"></div>
         </div>
         <button id="add-channel-button">Kanal Ekle</button>
+        <h3>Embed Kanal Ekle</h3>
+        <input type="text" id="embed-url" placeholder="Embed Kodu" />
+        <button id="add-embed-button">Embed Ekle</button>
         <button id="close-settings">Kapat</button>
     </div>
 
@@ -276,7 +281,7 @@
     </div>
 
     <div id="notification">Kanal: <span id="channel-number"></span><br><span id="channel-name"></span></div> <!-- Kanal bildirim alanı -->
-    
+
     <script>
         const defaultM3UUrls = [
             {
@@ -285,7 +290,7 @@
             }
         ];
         let channels = [];
-        let currentChannelIndex = null;
+        let currentChannelIndex = 0;
         let lastPlayedChannelUrl = null;
         let savedChannels = [];
         let selectedChannelIndex = 0;
@@ -377,13 +382,29 @@
         }
 
         function playVideo(url) {
-            const video = document.getElementById('player');
-            const hls = new Hls();
-            hls.loadSource(url);
-            hls.attachMedia(video);
-            hls.on(Hls.Events.MANIFEST_PARSED, function () {
-                video.play(); // Videoyu otomatik olarak oynat
-            });
+            const videoPlayer = document.getElementById('video-placeholder');
+            videoPlayer.innerHTML = ''; // Önceki içeriği temizle
+
+            // Eğer URL bir iframe embed kodu içeriyorsa onu işlemeye al
+            if (url.startsWith('<iframe')) {
+                const iframe = document.createElement('iframe');
+                // Embed kodundan URL'yi ayıkla
+                const src = url.match(/src="([^"]+)"/)[1];
+                iframe.src = src;
+                iframe.frameBorder = "0";
+                iframe.allow = "accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share";
+                iframe.allowFullscreen = true;
+                videoPlayer.appendChild(iframe); // Ekle
+            } else {
+                const video = document.createElement('video');
+                const hls = new Hls();
+                hls.loadSource(url);
+                hls.attachMedia(video);
+                hls.on(Hls.Events.MANIFEST_PARSED, function () {
+                    video.play(); // Videoyu otomatik olarak oynat
+                });
+                videoPlayer.appendChild(video); // Ekle
+            }
         }
 
         function updateCurrentChannelInfo() {
@@ -514,6 +535,19 @@
         document.getElementById('toggle-added-lists').addEventListener('click', function() {
             const list = document.getElementById('saved-channels-list');
             list.style.display = list.style.display === 'none' ? 'block' : 'none';
+        });
+
+        document.getElementById('add-embed-button').addEventListener('click', function() {
+            const embedUrl = document.getElementById('embed-url').value;
+            if (embedUrl) {
+                // Embed kodunu işleme al ve kanallara ekle
+                const name = 'Embed Kanal ' + (channels.length + 1);
+                savedChannels.push({ name, url: embedUrl });
+                playVideo(embedUrl); // Embedi oynat
+                displayChannels();
+                document.getElementById('embed-url').value = ''; // Girdi alanını temizle
+                channels.push({ name: name, url: embedUrl }); // Embedi kanallara ekle
+            }
         });
 
         window.onload = function () {
