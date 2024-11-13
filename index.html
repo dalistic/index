@@ -49,6 +49,8 @@
             flex-direction: column;
             gap: 10px;
             padding-top: 20px;
+            max-height: 100%;
+            overflow-y: auto;
         }
         .channel-item {
             padding: 25px;
@@ -77,11 +79,8 @@
             margin: 0;
             font-size: 14px;
         }
-        #menu-button {
+        #menu-button, #prev-channel, #next-channel, #hamburger-menu {
             position: fixed;
-            bottom: 30px;
-            left: 50%;
-            transform: translateX(-50%);
             background-color: rgba(0, 0, 0, 0.8);
             color: white;
             border: none;
@@ -91,36 +90,29 @@
             cursor: pointer;
             z-index: 3;
             transition: background-color 0.3s;
+            display: none; /* Başlangıçta gizli */
         }
-        #menu-button:hover {
+        #menu-button:hover, #prev-channel:hover, #next-channel:hover, #hamburger-menu:hover {
             background-color: rgba(0, 0, 0, 0.9);
         }
-        #prev-channel, #next-channel {
-            position: fixed;
-            top: 50%;
-            transform: translateY(-50%);
-            background-color: rgba(0, 0, 0, 0.6);
-            color: white;
-            border: none;
-            padding: 15px;
-            cursor: pointer;
-            z-index: 3;
-            font-size: 20px;
+        #menu-button {
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%);
         }
         #prev-channel {
+            top: 50%;
             left: 20px;
+            transform: translateY(-50%);
         }
         #next-channel {
+            top: 50%;
             right: 20px;
+            transform: translateY(-50%);
         }
         #hamburger-menu {
-            position: fixed;
             top: 10px;
             right: 10px;
-            font-size: 30px;
-            cursor: pointer;
-            color: white;
-            z-index: 4;
         }
         #settings-panel {
             position: fixed;
@@ -242,7 +234,7 @@
         </div>
     </div>
 
-    <div id="current-channel-info" style="position: fixed; top: 10px; left: 10px; color: white;">
+    <div id="current-channel-info" style="position: fixed; top: 10px; left: 10px; color: white; display: none;">
         <img id="current-channel-logo" src="" alt="Logo" style="width: 30px; height: 20px; vertical-align: middle;"/>
         <span id="current-channel-name"></span>
     </div>
@@ -298,6 +290,9 @@
         let selectedChannelIndex = 0;
         const channelsPerPage = 10; // Her sayfada gösterilecek kanal sayısı
         let currentPage = 0; // Mevcut sayfa
+        let isMenuVisible = false;
+        let mouseMoveTimeout;
+        let isFullScreen = false;
 
         async function loadDefaultChannels() {
             for (const { url, name } of defaultM3UUrls) {
@@ -381,6 +376,7 @@
                 saveToLocalStorage();
             }
             displayChannels();
+            hideMenuButtons();
         }
 
         function playVideo(url) {
@@ -491,6 +487,7 @@
             const currentChannelName = channels[currentChannelIndex].name;
             localStorage.setItem('lastPlayedChannel', currentChannelUrl);
             localStorage.setItem('lastPlayedChannelName', currentChannelName);
+            localStorage.setItem('isFullScreen', isFullScreen);
         }
 
         function loadFromLocalStorage() {
@@ -502,6 +499,10 @@
                     playVideo(channels[currentChannelIndex].url);
                     updateCurrentChannelInfo();
                 }
+            }
+            isFullScreen = localStorage.getItem('isFullScreen') === 'true';
+            if (isFullScreen) {
+                document.documentElement.requestFullscreen();
             }
         }
 
@@ -556,7 +557,39 @@
         window.onload = function () {
             loadDefaultChannels();
             loadFromLocalStorage();
+            hideMenuButtons();
+            document.addEventListener('keydown', handleKeyPress);
+            document.addEventListener('mousemove', handleMouseMove);
+            document.addEventListener('fullscreenchange', handleFullScreenChange);
         };
+
+        function handleKeyPress(event) {
+            if (event.key === 'Enter') {
+                toggleMenuButtons();
+            }
+        }
+
+        function handleMouseMove() {
+            clearTimeout(mouseMoveTimeout);
+            toggleMenuButtons();
+            mouseMoveTimeout = setTimeout(hideMenuButtons, 3000);
+        }
+
+        function toggleMenuButtons() {
+            const buttons = document.querySelectorAll('#menu-button, #prev-channel, #next-channel, #hamburger-menu');
+            buttons.forEach(button => {
+                button.style.display = isMenuVisible ? 'none' : 'block';
+            });
+            isMenuVisible = !isMenuVisible;
+        }
+
+        function hideMenuButtons() {
+            const buttons = document.querySelectorAll('#menu-button, #prev-channel, #next-channel, #hamburger-menu');
+            buttons.forEach(button => {
+                button.style.display = 'none';
+            });
+            isMenuVisible = false;
+        }
 
         document.getElementById('prev-channel').addEventListener('click', changeChannel(-1));
         document.getElementById('next-channel').addEventListener('click', changeChannel(1));
@@ -648,7 +681,17 @@
                 if (selectedChannelDiv) {
                     selectedChannelDiv.scrollIntoView({ block: "end", inline: "nearest" });
                 }
+
+                // Kanal değiştirildiğinde otomatik tam ekran moduna geç
+                if (!isFullScreen) {
+                    document.documentElement.requestFullscreen();
+                }
             };
+        }
+
+        function handleFullScreenChange() {
+            isFullScreen = document.fullscreenElement !== null;
+            saveToLocalStorage();
         }
     </script>
 </body>
