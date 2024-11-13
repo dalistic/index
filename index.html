@@ -20,12 +20,13 @@
             width: 100%;
             height: 100%;
             z-index: 1;
+            overflow: hidden; /* Scroll bar'ı gizle */
         }
         #video-player video, 
         #video-player iframe {
             width: 100%;
             height: 100%;
-            border: none; /* iframe kenarlarını gizle */
+            border: none;
         }
         #channel-menu {
             position: fixed;
@@ -50,7 +51,10 @@
             gap: 10px;
             padding-top: 20px;
             max-height: 100%;
-            overflow-y: auto;
+            overflow-y: scroll; /* Dikey kaydırma çubuğunu göster */
+        }
+        #channel-list::-webkit-scrollbar {
+            display: none; /* Webkit bazlı tarayıcılarda scroll bar'ı gizle */
         }
         .channel-item {
             padding: 25px;
@@ -75,13 +79,9 @@
             object-fit: cover;
             margin-bottom: 10px;
         }
-        .channel-item h3 {
-            margin: 0;
-            font-size: 14px;
-        }
         #menu-button, #prev-channel, #next-channel, #hamburger-menu {
             position: fixed;
-            background-color: rgba(0, 0, 0, 0.8);
+            background-color: rgba(0, 0, 0, 1); /* Arka planı opak yap */
             color: white;
             border: none;
             padding: 20px;
@@ -90,10 +90,9 @@
             cursor: pointer;
             z-index: 3;
             transition: background-color 0.3s;
-            display: none; /* Başlangıçta gizli */
         }
         #menu-button:hover, #prev-channel:hover, #next-channel:hover, #hamburger-menu:hover {
-            background-color: rgba(0, 0, 0, 0.9);
+            background-color: rgba(0, 0, 0, 0.8);
         }
         #menu-button {
             bottom: 30px;
@@ -143,29 +142,6 @@
         #settings-panel button:hover {
             background-color: #444;
         }
-        .toggle-list {
-            cursor: pointer;
-            padding: 10px;
-            background-color: #222;
-            border-radius: 5px;
-            margin: 10px 0;
-            color: white;
-            transition: background-color 0.3s;
-        }
-        .toggle-list:hover {
-            background-color: #333;
-        }
-        .saved-channel {
-            padding: 8px;
-            background-color: #444;
-            border-radius: 5px;
-            margin-top: 5px;
-            color: #fff;
-            cursor: pointer;
-        }
-        .saved-channel:hover {
-            background-color: #555;
-        }
         #add-channel-modal {
             position: fixed;
             top: 0;
@@ -205,7 +181,6 @@
             background-color: #444;
         }
 
-        /* Bildirim alanı için stil */
         #notification {
             position: fixed;
             top: 20px; /* Üstte olacak şekilde konumlandırdım */
@@ -262,6 +237,13 @@
         <h3>Embed Kanal Ekle</h3>
         <input type="text" id="embed-url" placeholder="Embed Kodu" />
         <button id="add-embed-button">Embed Ekle</button>
+        <h3>Kalite Seçimi</h3>
+        <select id="quality-select">
+            <option value="auto">Otomatik</option>
+            <option value="480">480p</option>
+            <option value="720">720p</option>
+            <option value="1080">1080p</option>
+        </select>
         <button id="close-settings">Kapat</button>
     </div>
 
@@ -274,7 +256,7 @@
         </form>
     </div>
 
-    <div id="notification">Kanal: <span id="channel-number"></span><br><span id="channel-name"></span></div> <!-- Kanal bildirim alanı -->
+    <div id="notification">Kanal: <span id="channel-number"></span><br><span id="channel-name"></span></div>
 
     <script>
         const defaultM3UUrls = [
@@ -288,11 +270,12 @@
         let lastPlayedChannelUrl = null;
         let savedChannels = [];
         let selectedChannelIndex = 0;
-        const channelsPerPage = 10; // Her sayfada gösterilecek kanal sayısı
-        let currentPage = 0; // Mevcut sayfa
+        const channelsPerPage = 10; 
+        let currentPage = 0; 
         let isMenuVisible = false;
         let mouseMoveTimeout;
         let isFullScreen = false;
+        let selectedQuality = 'auto'; 
 
         async function loadDefaultChannels() {
             for (const { url, name } of defaultM3UUrls) {
@@ -311,9 +294,9 @@
             displayChannels();
 
             if (channels.length > 0) {
-                currentChannelIndex = 0; // İlk kanalı ayarlama
-                playVideo(channels[currentChannelIndex].url); // İlk kanalı oynat
-                lastPlayedChannelUrl = channels[currentChannelIndex].url; // Son izlenen URL
+                currentChannelIndex = 0; 
+                playVideo(channels[currentChannelIndex].url); 
+                lastPlayedChannelUrl = channels[currentChannelIndex].url; 
                 updateCurrentChannelInfo();
             }
         }
@@ -356,10 +339,9 @@
                 channelList.appendChild(channelDiv);
             });
 
-            // Seçili kanalın görünür olmasını sağla
             const selectedChannelDiv = channelList.querySelector('.selected');
             if (selectedChannelDiv) {
-                selectedChannelDiv.scrollIntoView({ block: "nearest", inline: "start" });
+                selectedChannelDiv.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
             }
         }
 
@@ -372,7 +354,7 @@
                 playVideo(channels[index].url);
                 lastPlayedChannelUrl = channels[index].url;
                 updateCurrentChannelInfo();
-                showNotification(index); // Bildirimi göster
+                showNotification(index); 
                 saveToLocalStorage();
             }
             displayChannels();
@@ -381,29 +363,39 @@
 
         function playVideo(url) {
             const videoPlayer = document.getElementById('video-placeholder');
-            videoPlayer.innerHTML = ''; // Önceki içeriği temizle
+            videoPlayer.innerHTML = ''; 
 
-            // Eğer URL bir iframe embed kodu içeriyorsa onu işlemeye al
             if (url.startsWith('<iframe')) {
                 const iframe = document.createElement('iframe');
-                // Embed kodundan URL'yi ayıkla
                 const src = url.match(/src="([^"]+)"/)[1];
                 iframe.src = src;
-                iframe.style.width = "100vw"; // Tam genişlik
-                iframe.style.height = "100vh"; // Tam yükseklik
+                iframe.style.width = "100vw"; 
+                iframe.style.height = "100vh"; 
                 iframe.frameBorder = "0";
                 iframe.allow = "accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share";
                 iframe.allowFullscreen = true;
-                videoPlayer.appendChild(iframe); // Ekle
+                videoPlayer.appendChild(iframe); 
             } else {
                 const video = document.createElement('video');
                 const hls = new Hls();
                 hls.loadSource(url);
                 hls.attachMedia(video);
                 hls.on(Hls.Events.MANIFEST_PARSED, function () {
-                    video.play(); // Videoyu otomatik olarak oynat
+                    video.play(); 
+                    setQuality(hls); 
                 });
-                videoPlayer.appendChild(video); // Ekle
+                videoPlayer.appendChild(video); 
+            }
+        }
+
+        function setQuality(hls) {
+            if (selectedQuality === 'auto') {
+                hls.currentLevel = -1; 
+            } else {
+                const qualityLevel = hls.levels.findIndex(level => level.height === parseInt(selectedQuality));
+                if (qualityLevel !== -1) {
+                    hls.currentLevel = qualityLevel;
+                }
             }
         }
 
@@ -424,14 +416,14 @@
         function showNotification(index) {
             const notification = document.getElementById('notification');
             const channelName = channels[index].name;
-            const channelLogo = channels[index].logo || 'https://via.placeholder.com/80x50'; // Logo varsayılan
+            const channelLogo = channels[index].logo || 'https://via.placeholder.com/80x50'; 
             notification.innerHTML = `
                 <img src="${channelLogo}" alt="Logo"/><br>
                 ${channelName} (${index + 1})
             `;
             notification.style.display = 'block';
             setTimeout(() => {
-                notification.style.display = 'none'; // 6 saniye sonra bildirimi gizle
+                notification.style.display = 'none'; 
             }, 6000);
         }
 
@@ -471,7 +463,7 @@
                 .then(data => {
                     channels = parseM3U(data);
                     selectedChannelIndex = 0;
-                    currentPage = 0; // Sayfayı sıfırla
+                    currentPage = 0; 
                     displayChannels();
                     currentChannelIndex = 0;
                     playVideo(channels[currentChannelIndex].url);
@@ -488,6 +480,7 @@
             localStorage.setItem('lastPlayedChannel', currentChannelUrl);
             localStorage.setItem('lastPlayedChannelName', currentChannelName);
             localStorage.setItem('isFullScreen', isFullScreen);
+            localStorage.setItem('selectedQuality', selectedQuality);
         }
 
         function loadFromLocalStorage() {
@@ -501,9 +494,11 @@
                 }
             }
             isFullScreen = localStorage.getItem('isFullScreen') === 'true';
+            selectedQuality = localStorage.getItem('selectedQuality') || 'auto';
             if (isFullScreen) {
                 document.documentElement.requestFullscreen();
             }
+            document.getElementById('quality-select').value = selectedQuality;
         }
 
         document.getElementById('hamburger-menu').addEventListener('click', () => {
@@ -547,10 +542,18 @@
             if (embedUrl) {
                 const name = 'Embed Kanal ' + (channels.length + 1);
                 savedChannels.push({ name, url: embedUrl });
-                playVideo(embedUrl); // Embedi oynat
+                playVideo(embedUrl); 
                 displayChannels();
-                channels.push({ name: name, url: embedUrl }); // Embedi kanallara ekle
-                document.getElementById('embed-url').value = ''; // Girdi alanını temizle
+                channels.push({ name: name, url: embedUrl }); 
+                document.getElementById('embed-url').value = ''; 
+            }
+        });
+
+        document.getElementById('quality-select').addEventListener('change', function() {
+            selectedQuality = this.value;
+            saveToLocalStorage();
+            if (currentChannelIndex !== -1) {
+                playVideo(channels[currentChannelIndex].url);
             }
         });
 
@@ -579,6 +582,15 @@
             const buttons = document.querySelectorAll('#menu-button, #prev-channel, #next-channel, #hamburger-menu');
             buttons.forEach(button => {
                 button.style.display = isMenuVisible ? 'none' : 'block';
+                button.addEventListener('mouseenter', () => {
+                    button.style.display = 'block'; // Buton üzerine gelindiğinde görünür kıl
+                });
+                
+                button.addEventListener('mouseleave', () => {
+                    if (!isMenuVisible) {
+                        button.style.display = 'none'; // Buton üzerindeyken çıkıldığında gizle
+                    }
+                });
             });
             isMenuVisible = !isMenuVisible;
         }
@@ -606,12 +618,12 @@
                     if (selectedChannelIndex > 0) {
                         selectedChannelIndex--;
                         if (selectedChannelIndex % channelsPerPage === channelsPerPage - 1) {
-                            currentPage--; // Eğer 10. kanala ulaşıldıysa bir önceki sayfaya geç
+                            currentPage--; 
                         }
                         displayChannels();
                     } else {
-                        selectedChannelIndex = channels.length - 1; // En sona git
-                        currentPage = Math.floor(selectedChannelIndex / channelsPerPage); // Sayfayı güncelle
+                        selectedChannelIndex = channels.length - 1; 
+                        currentPage = Math.floor(selectedChannelIndex / channelsPerPage); 
                         displayChannels();
                     }
                     break;
@@ -619,12 +631,12 @@
                     if (selectedChannelIndex < channels.length - 1) {
                         selectedChannelIndex++;
                         if (selectedChannelIndex % channelsPerPage === 0) {
-                            currentPage++; // Eğer 10. kanala ulaşıldıysa bir sonraki sayfaya geç
+                            currentPage++; 
                         }
                         displayChannels();
                     } else {
-                        selectedChannelIndex = 0; // En başa git
-                        currentPage = 0; // Sayfayı sıfırla
+                        selectedChannelIndex = 0; 
+                        currentPage = 0; 
                         displayChannels();
                     }
                     break;
@@ -673,16 +685,14 @@
                 playVideo(channels[currentChannelIndex].url);
                 updateCurrentChannelInfo();
                 saveToLocalStorage();
-                showNotification(currentChannelIndex); // Bildirimi göster
+                showNotification(currentChannelIndex); 
 
-                // Seçili kanal yukarı kaydırıldığında görünür olmasını sağla
                 const channelList = document.getElementById('channel-list');
                 const selectedChannelDiv = channelList.querySelector('.selected');
                 if (selectedChannelDiv) {
-                    selectedChannelDiv.scrollIntoView({ block: "end", inline: "nearest" });
+                    selectedChannelDiv.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); // Kanal değiştiğinde görünür kıl
                 }
 
-                // Kanal değiştirildiğinde otomatik tam ekran moduna geç
                 if (!isFullScreen) {
                     document.documentElement.requestFullscreen();
                 }
